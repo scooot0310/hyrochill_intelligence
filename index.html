@@ -71,8 +71,12 @@
   .pump-card { padding: .65rem .85rem; border-radius: 9px; border: 1px solid var(--border); margin-bottom: 9px; display: flex; justify-content: space-between; align-items: center; transition: background .3s; }
   .pump-card.on  { background: var(--teal-light); border-color: var(--teal-mid); }
   .pump-card.off { background: var(--gray-50); }
+  .pump-card.spraying { background: var(--teal-light); border-color: var(--teal-mid); animation: spray-pulse 1s ease-in-out infinite; }
+  .pump-card.blocked { background: var(--red-light); border-color: var(--red); }
   .pump-label { font-size: 13px; font-weight: 500; }
-  .pump-card.on .pump-label { color: var(--teal-dark); }
+  .pump-card.on .pump-label, .pump-card.spraying .pump-label { color: var(--teal-dark); }
+  .pump-card.blocked .pump-label { color: var(--red); }
+  @keyframes spray-pulse { 0%,100%{box-shadow: 0 0 0 0 rgba(29,158,117,0.4)} 50%{box-shadow: 0 0 0 6px rgba(29,158,117,0)} }
 
   .badge { font-size: 11px; padding: 2px 9px; border-radius: 20px; font-weight: 500; }
   .b-on { background: var(--teal-mid); color: var(--teal-dark); }
@@ -114,25 +118,30 @@
   <div id="stale-banner" class="stale-banner">⚠ No fresh data from ESP32 in 30+ seconds — check device power and WiFi</div>
 
   <div class="section">Today's performance</div>
-  <div class="grid2">
+  <div class="grid3">
     <div class="card"><div class="card-title">Energy saved</div><div class="kpi-val" id="kpi-energy">—</div><div class="kpi-unit">kWh vs baseline</div></div>
     <div class="card"><div class="card-title">Load reduction</div><div class="kpi-val" id="kpi-pct">—</div><div class="kpi-unit">compressor load</div></div>
-    <div class="card"><div class="card-title">Pump runtime</div><div class="kpi-val" id="kpi-runtime" style="color:var(--text)">—</div><div class="kpi-unit">hours today</div></div>
-    <div class="card"><div class="card-title">CO₂ avoided</div><div class="kpi-val" id="kpi-co2">—</div><div class="kpi-unit">kg today</div></div>
+    <div class="card"><div class="card-title">Spray runtime</div><div class="kpi-val" id="kpi-runtime" style="color:var(--text)">—</div><div class="kpi-unit">hours today</div></div>
   </div>
 
   <div class="section">Water system</div>
   <div class="grid2">
     <div class="card">
-      <div class="card-title">12V pump control</div>
+      <div class="card-title">Misting system</div>
       <div class="pump-card off" id="pump-card">
         <span class="pump-label" id="pump-lbl">—</span>
         <span class="badge b-off" id="pump-badge">—</span>
       </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin:.5rem 0 .25rem;">
+        <span>Cycle pattern:</span><span><strong>3s spray · 2s pause</strong></span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);">
+        <span>Cycles today:</span><span id="cycle-count">—</span>
+      </div>
       <div class="cmd-row">
         <button class="cmd-btn" id="b-on"   onclick="sendCmd('ON')">Manual ON</button>
         <button class="cmd-btn" id="b-off"  onclick="sendCmd('OFF')">Manual OFF</button>
-        <button class="cmd-btn s-auto" id="b-auto" onclick="sendCmd('AUTO')">Auto</button>
+        <button class="cmd-btn s-auto" id="b-auto" onclick="sendCmd('AUTO')">Auto cycle</button>
       </div>
       <div class="src">→ Firebase /coolgrid/cmd</div>
     </div>
@@ -147,21 +156,48 @@
   </div>
 
   <div class="section">Temperature sensors</div>
-  <div class="grid3">
+  <div class="grid2">
     <div class="card">
-      <div class="card-title">DHT11 · Indoor</div>
-      <div class="big norm" id="t11-temp">—</div>
-      <div class="row" style="margin-top:.5rem"><span class="row-label">Humidity</span><span class="row-val" id="t11-hum">—</span></div>
+      <div class="card-title">DS18B20 · Cistern water</div>
+      <div class="big norm" id="wt-temp" style="font-size:32px;">—</div>
+      <div class="kpi-unit">Rainwater temperature</div>
+      <div class="row" style="margin-top:.6rem"><span class="row-label">Safety stop</span><span class="row-val hot">≥ 45°C</span></div>
+      <div class="row"><span class="row-label">Total spray</span><span class="row-val" id="spray-time">—</span></div>
     </div>
     <div class="card">
-      <div class="card-title">DHT22 · Condenser</div>
-      <div class="big norm" id="t22-temp">—</div>
-      <div class="row" style="margin-top:.5rem"><span class="row-label">Humidity</span><span class="row-val" id="t22-hum">—</span></div>
+      <div class="card-title">DS18B20 · Compressor</div>
+      <div class="big norm" id="comp-temp" style="font-size:32px;">—</div>
+      <div class="kpi-unit">Heat chamber temperature</div>
+      <div class="row" style="margin-top:.6rem"><span class="row-label">Warm</span><span class="row-val warm">≥ 45°C</span></div>
+      <div class="row"><span class="row-label">Hot</span><span class="row-val hot">≥ 60°C</span></div>
     </div>
-    <div class="card">
-      <div class="card-title">DS18B20 · Water temp</div>
-      <div class="big norm" id="wt-temp">—</div>
-      <div class="row" style="margin-top:.5rem"><span class="row-label">Target</span><span class="row-val cool">≤ 28°C</span></div>
+  </div>
+
+  <div class="section">Cooling effectiveness <span style="color:var(--blue);font-weight:600;text-transform:none;letter-spacing:0;">· AI analysis</span></div>
+  <div class="card" id="eff-card">
+    <div class="card-title">Real-time spray cycle performance</div>
+    <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start;">
+      <div style="flex:1;min-width:160px;">
+        <div class="kpi-unit">Average cooling per cycle</div>
+        <div class="big" id="eff-avg" style="font-size:36px;">—</div>
+        <div class="kpi-unit" id="eff-cycles">Calibrating...</div>
+      </div>
+      <div style="flex:1;min-width:160px;">
+        <div class="row"><span class="row-label">Latest cycle</span><span class="row-val" id="eff-last">—</span></div>
+        <div class="row"><span class="row-label">Best cycle</span><span class="row-val cool" id="eff-best">—</span></div>
+        <div class="row"><span class="row-label">Cumulative cooling</span><span class="row-val" id="eff-cumulative">—</span></div>
+        <div class="row"><span class="row-label">Since AUTO started</span><span class="row-val" id="eff-session">—</span></div>
+      </div>
+    </div>
+    <div style="margin-top:.9rem">
+      <div class="kpi-unit" style="margin-bottom:.4rem">Last 10 cycles (°C drop per cycle)</div>
+      <div id="eff-bars" style="display:flex;align-items:flex-end;gap:4px;height:60px;border-bottom:1px solid var(--border);padding-bottom:0;">
+        <div style="color:var(--text-muted);font-size:11px;align-self:center;margin:0 auto;">No cycles yet — waiting for AUTO mode</div>
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:4px;display:flex;justify-content:space-between;">
+        <span>← oldest</span>
+        <span>newest →</span>
+      </div>
     </div>
   </div>
 
@@ -224,59 +260,121 @@
   // ── apply data to UI ────────────────────────
   function applyData(d) {
     // KPIs
-    pumpRtH = parseFloat(d.pump_runtime_hours) || 0;
+    pumpRtH = parseFloat(d.total_spray_seconds || 0) / 3600.0;
     const kwh = (pumpRtH * 0.18).toFixed(2);
     const pct = Math.min(12 + pumpRtH * 1.4, 29).toFixed(1);
-    const co2 = (kwh * 0.44).toFixed(2);
     setText('kpi-energy',  kwh + ' kWh');
     setText('kpi-pct',     pct + '%');
     setText('kpi-runtime', pumpRtH.toFixed(2) + ' h');
-    setText('kpi-co2',     co2 + ' kg');
 
-    // Pump
+    // Misting system
     const card  = document.getElementById('pump-card');
     const lbl   = document.getElementById('pump-lbl');
     const badge = document.getElementById('pump-badge');
-    if (d.pump_on) {
-      card.className  = 'pump-card on';
-      lbl.textContent = d.auto_mode ? 'Running (auto)' : 'Running (manual)';
-      badge.className = 'badge b-on';  badge.textContent = 'ON';
+    const state = d.mist_state || 'IDLE';
+    const mode  = d.pump_mode  || 'AUTO';
+
+    if (state === 'BLOCKED') {
+      card.className = 'pump-card blocked';
+      lbl.textContent = 'Blocked — cistern low or water too hot';
+      badge.className = 'badge b-off'; badge.textContent = 'BLOCK';
+    } else if (state === 'SPRAYING') {
+      card.className = 'pump-card spraying';
+      lbl.textContent = mode === 'ON' ? 'Spraying (continuous)' : 'Spraying...';
+      badge.className = 'badge b-on'; badge.textContent = 'SPRAY';
+    } else if (state === 'PAUSED') {
+      card.className = 'pump-card on';
+      lbl.textContent = 'Paused (cycle)';
+      badge.className = 'badge b-on'; badge.textContent = 'PAUSE';
     } else {
-      card.className  = 'pump-card off';
-      lbl.textContent = d.auto_mode ? 'Standby (auto)' : 'Stopped (manual)';
-      badge.className = 'badge b-off'; badge.textContent = 'OFF';
+      card.className = 'pump-card off';
+      lbl.textContent = mode === 'OFF' ? 'Stopped (manual)' : 'Idle';
+      badge.className = 'badge b-off'; badge.textContent = 'IDLE';
     }
 
+    setText('cycle-count', d.cycle_count != null ? d.cycle_count : '—');
+    const sprayS = parseFloat(d.total_spray_seconds || 0);
+    setText('spray-time', sprayS < 60 ? sprayS.toFixed(0) + ' s' : (sprayS / 60).toFixed(1) + ' min');
+
     // Cistern
-    const pct2 = parseFloat(d.cistern_pct ?? d.cistern?.level_pct ?? 0);
-    const cm   = parseFloat(d.cistern_cm  ?? d.cistern?.distance_cm ?? 0);
+    const pct2 = parseFloat(d.cistern_pct ?? 0);
+    const cm   = parseFloat(d.cistern_cm  ?? 0);
     setText('cis-pct',  pct2.toFixed(0) + '%');
     setText('cis-dist', cm.toFixed(1) + ' cm from sensor');
     const fill = document.getElementById('cis-fill');
     fill.style.width      = pct2 + '%';
     fill.style.background = pct2 < 20 ? 'var(--red)' : pct2 < 35 ? 'var(--amber)' : 'var(--teal)';
     const cst = document.getElementById('cis-status');
-    if (pct2 < 15)      { cst.textContent = '⚠ Critically low — pump blocked'; cst.style.color = 'var(--red)'; }
-    else if (pct2 < 35) { cst.textContent = 'Low — monitor closely';            cst.style.color = 'var(--amber)'; }
-    else                { cst.textContent = 'Sufficient for operation';         cst.style.color = 'var(--teal)'; }
+    if (pct2 < 15)      { cst.textContent = '⚠ Critically low — misting blocked'; cst.style.color = 'var(--red)'; }
+    else if (pct2 < 35) { cst.textContent = 'Low — monitor closely';                cst.style.color = 'var(--amber)'; }
+    else                { cst.textContent = 'Sufficient for operation';             cst.style.color = 'var(--teal)'; }
 
-    // Temperatures
-    const t11 = parseFloat(d.dht11_temp ?? d.dht11?.temp_c);
-    const t22 = parseFloat(d.dht22_temp ?? d.dht22?.temp_c);
-    const wt  = parseFloat(d.water_temp ?? d.water?.temp_c);
-    setBig('t11-temp', t11, 38, 33);
-    setBig('t22-temp', t22, 36, 32);
-    setBig('wt-temp',  wt,  35, 30);
-    setText('t11-hum', (d.dht11_hum ?? d.dht11?.humidity ?? '—') + '%');
-    setText('t22-hum', (d.dht22_hum ?? d.dht22?.humidity ?? '—') + '%');
+    // Water + compressor temperatures
+    const wt = parseFloat(d.water_temp);
+    setBig('wt-temp', wt, 45, 35);
+    const ct = parseFloat(d.compressor_temp);
+    setBig('comp-temp', ct, 60, 45);
+
+    // ── Cooling effectiveness ──────────────────
+    const effAvg    = parseFloat(d.eff_avg_delta || 0);
+    const effLast   = parseFloat(d.eff_last_delta || 0);
+    const effBest   = parseFloat(d.eff_best_delta || 0);
+    const effCum    = parseFloat(d.eff_cumulative || 0);
+    const effN      = parseInt(d.eff_cycles_measured || 0);
+    const effAnom   = !!d.eff_anomalous;
+    const sessStart = parseFloat(d.eff_session_start_c);
+    const history   = Array.isArray(d.eff_history) ? d.eff_history : [];
+
+    // Average display + class
+    const avgEl = document.getElementById('eff-avg');
+    if (effN < 3) {
+      avgEl.textContent = '—';
+      avgEl.className = 'big norm';
+    } else {
+      avgEl.textContent = (effAvg >= 0 ? '−' : '+') + Math.abs(effAvg).toFixed(2) + ' °C';
+      // Note: positive delta means temp dropped (cooling), so we show as "−2.3°C" (drop)
+      avgEl.className = 'big ' + (effAvg > 0.1 ? 'cool' : effAvg < -0.1 ? 'hot' : 'norm');
+    }
+
+    setText('eff-cycles', effN === 0 ? 'Calibrating — no cycles measured yet'
+                          : effN < 3 ? `Calibrating · ${effN}/3 cycles needed`
+                          : `Based on last ${effN} cycle${effN === 1 ? '' : 's'}`);
+    setText('eff-last',       effN === 0 ? '—' : (effLast >= 0 ? '−' : '+') + Math.abs(effLast).toFixed(2) + ' °C');
+    setText('eff-best',       effBest === 0 ? '—' : '−' + effBest.toFixed(2) + ' °C');
+    setText('eff-cumulative', effCum.toFixed(1) + ' °C');
+    if (!isNaN(sessStart) && sessStart > -50 && !isNaN(ct)) {
+      const sessDrop = sessStart - ct;
+      setText('eff-session', (sessDrop >= 0 ? '−' : '+') + Math.abs(sessDrop).toFixed(1) + ' °C');
+    } else {
+      setText('eff-session', '—');
+    }
+
+    // Bar chart of last 10 cycles
+    const barsEl = document.getElementById('eff-bars');
+    if (history.length === 0) {
+      barsEl.innerHTML = '<div style="color:var(--text-muted);font-size:11px;align-self:center;margin:0 auto;">No cycles yet — waiting for AUTO mode</div>';
+    } else {
+      const maxAbs = Math.max(0.1, ...history.map(v => Math.abs(parseFloat(v))));
+      barsEl.innerHTML = history.map(v => {
+        const val = parseFloat(v);
+        const heightPct = Math.min(100, (Math.abs(val) / maxAbs) * 100);
+        const color = val >= 0 ? 'var(--teal)' : 'var(--red)';
+        const title = val.toFixed(2) + '°C ' + (val >= 0 ? 'cooled' : 'warmed');
+        return `<div title="${title}" style="flex:1;background:${color};height:${heightPct}%;border-radius:2px 2px 0 0;min-height:2px;"></div>`;
+      }).join('');
+    }
 
     // Alerts
     const alerts = [];
-    if (wt >= 35)         alerts.push({t:'warn', m:'Water at ' + wt + '°C — pre-cooling needed'});
-    if (t11 >= 38)        alerts.push({t:'warn', m:'High indoor ambient: ' + t11 + '°C'});
-    if (pct2 < 15)        alerts.push({t:'warn', m:'Cistern critically low — pump blocked'});
-    if (d.pump_on && wt <= 28) alerts.push({t:'ok', m:'Target reached: water at ' + wt + '°C'});
-    if (alerts.length === 0) alerts.push({t:'ok', m:'All systems nominal'});
+    if (state === 'BLOCKED' && pct2 < 15) alerts.push({t:'warn', m:'Misting blocked: cistern critically low'});
+    if (!isNaN(wt) && wt >= 45)           alerts.push({t:'warn', m:'Water temperature high: ' + wt.toFixed(1) + '°C — safety stop engaged'});
+    if (!isNaN(ct) && ct >= 60)           alerts.push({t:'warn', m:'Compressor very hot: ' + ct.toFixed(1) + '°C — misting recommended'});
+    else if (!isNaN(ct) && ct >= 45)      alerts.push({t:'info', m:'Compressor warm: ' + ct.toFixed(1) + '°C'});
+    if (effAnom)                          alerts.push({t:'warn', m:'AI · Last cycle underperformed avg by ' + (effAvg - effLast).toFixed(2) + '°C — possible clog, low flow, or warm water'});
+    if (effN >= 5 && effAvg > 0.05)       alerts.push({t:'ok',   m:'AI · System is effectively cooling at ' + effAvg.toFixed(2) + '°C per cycle on average'});
+    if (state === 'SPRAYING' && mode === 'AUTO')
+                                          alerts.push({t:'ok', m:'Auto misting cycle active (3s spray / 2s pause)'});
+    if (alerts.length === 0)              alerts.push({t:'ok', m:'All systems nominal'});
     document.getElementById('alerts').innerHTML = alerts.map(a => `<div class="alert-item a-${a.t}">${a.m}</div>`).join('');
 
     setText('last-upd', 'Updated ' + new Date().toLocaleTimeString());

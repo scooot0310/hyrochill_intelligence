@@ -209,9 +209,6 @@
 
 <!-- Firebase SDK (modular v10) -->
 <script type="module">
- import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-const auth = getAuth(app);
-await signInWithEmailAndPassword(auth, "device@coolgrid.local", "061003070725");
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getDatabase, ref, onValue, set, serverTimestamp, onDisconnect } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
@@ -220,13 +217,13 @@ await signInWithEmailAndPassword(auth, "device@coolgrid.local", "061003070725");
   //  Get this from Firebase Console → Project Settings → "Your apps" → Web app
   // ─────────────────────────────────────────────
   const firebaseConfig = {
-    apiKey:        "YOUR_API_KEY",
-    authDomain:    "YOUR_PROJECT.firebaseapp.com",
-    databaseURL:   "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-    projectId:     "YOUR_PROJECT",
-    storageBucket: "YOUR_PROJECT.appspot.com",
-    appId:         "YOUR_APP_ID"
-  };
+  apiKey:        "AIzaSyDTwrr30zUl4Qo02XO-Rgd9aefhSGPBFCU",
+  authDomain:    "coolgrid-prototype.firebaseapp.com",
+  databaseURL:   "https://coolgrid-prototype-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:     "coolgrid-prototype",
+  storageBucket: "coolgrid-prototype.appspot.com",
+  appId:         "1:1002690522885:web:19b0dd4eb3c4ea8371916c"
+};
 
   const app = initializeApp(firebaseConfig);
   const db  = getDatabase(app);
